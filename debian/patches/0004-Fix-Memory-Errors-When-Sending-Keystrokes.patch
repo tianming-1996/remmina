@@ -1,0 +1,116 @@
+Index: remmina/src/remmina_protocol_widget.c
+===================================================================
+--- remmina.orig/src/remmina_protocol_widget.c
++++ remmina/src/remmina_protocol_widget.c
+@@ -540,8 +540,9 @@ gboolean remmina_protocol_widget_plugin_receives_keystrokes(RemminaProtocolWidge
+ void remmina_protocol_widget_send_keystrokes(RemminaProtocolWidget *gp, GtkMenuItem *widget)
+ {
+ 	TRACE_CALL(__func__);
+-	gchar *keystrokes = g_object_get_data(G_OBJECT(widget), "keystrokes");
+-	guint *keyvals;
++	const gchar *stored_keystrokes = g_object_get_data(G_OBJECT(widget), "keystrokes");
++	gchar *keystrokes;
++	guint keyvals[3];
+ 	gint i;
+ 	GdkKeymap *keymap = gdk_keymap_get_for_display(gdk_display_get_default());
+ 	gunichar character;
+@@ -566,18 +567,26 @@ void remmina_protocol_widget_send_keystrokes(RemminaProtocolWidget *gp, GtkMenuI
+ 		{ NULL,	  NULL, 0		  }
+ 	};
+ 
++	if (!stored_keystrokes)
++		return;
++
++	keystrokes = g_strdup(stored_keystrokes);
++
+ 	/* Keystrokes can only be sent to plugins that accepts them */
+ 	if (remmina_protocol_widget_plugin_receives_keystrokes(gp)) {
+ 		/* Replace special characters */
+ 		for (i = 0; keystrokes_replaces[i].replace; i++) {
++			gchar *replaced;
++
+ 			REMMINA_DEBUG("Keystrokes before replacement is \'%s\'", keystrokes);
+-			keystrokes = g_strdup(remmina_public_str_replace_in_place(keystrokes,
+-										  keystrokes_replaces[i].search,
+-										  keystrokes_replaces[i].replace));
++			replaced = remmina_public_str_replace(keystrokes,
++									 keystrokes_replaces[i].search,
++									 keystrokes_replaces[i].replace);
++			g_free(keystrokes);
++			keystrokes = replaced;
+ 			REMMINA_DEBUG("Keystrokes after replacement is \'%s\'", keystrokes);
+ 		}
+-		gchar *iter = g_strdup(keystrokes);
+-		keyvals = (guint *)g_malloc(strlen(keystrokes));
++		const gchar *iter = keystrokes;
+ 		while (TRUE) {
+ 			/* Process each character in the keystrokes */
+ 			character = g_utf8_get_char_validated(iter, -1);
+@@ -616,8 +625,6 @@ void remmina_protocol_widget_send_keystrokes(RemminaProtocolWidget *gp, GtkMenuI
+ 			/* Process next character in the keystrokes */
+ 			iter = g_utf8_find_next_char(iter, NULL);
+ 		}
+-		g_free(keyvals);
+-		g_free(iter);
+ 	}
+ 	g_free(keystrokes);
+ 	return;
+@@ -637,7 +644,7 @@ void remmina_protocol_widget_send_clip_strokes(GtkClipboard *clipboard, const gc
+ 		return;
+ 	}
+ 	gchar *text = g_utf8_normalize(clip_text, -1, G_NORMALIZE_DEFAULT_COMPOSE);
+-	guint *keyvals;
++	guint keyvals[3];
+ 	gint i;
+ 	GdkKeymap *keymap = gdk_keymap_get_for_display(gdk_display_get_default());
+ 	gunichar character;
+@@ -666,15 +673,18 @@ void remmina_protocol_widget_send_clip_strokes(GtkClipboard *clipboard, const gc
+ 		if (text) {
+ 			/* Replace special characters */
+ 			for (i = 0; text_replaces[i].replace; i++) {
++				gchar *replaced;
++
+ 				REMMINA_DEBUG("Text clipboard before replacement is \'%s\'", text);
+-				text = g_strdup(remmina_public_str_replace_in_place(text,
+-										    text_replaces[i].search,
+-										    text_replaces[i].replace));
++				replaced = remmina_public_str_replace(text,
++									      text_replaces[i].search,
++									      text_replaces[i].replace);
++				g_free(text);
++				text = replaced;
+ 				REMMINA_DEBUG("Text clipboard after replacement is \'%s\'", text);
+ 			}
+-			gchar *iter = g_strdup(text);
+-			REMMINA_DEBUG("Iter: %s", iter),
+-			keyvals = (guint *)g_malloc(strlen(text));
++			const gchar *iter = text;
++			REMMINA_DEBUG("Iter: %s", iter);
+ 			while (TRUE) {
+ 				/* Process each character in the keystrokes */
+ 				character = g_utf8_get_char_validated(iter, -1);
+@@ -709,11 +719,6 @@ void remmina_protocol_widget_send_clip_strokes(GtkClipboard *clipboard, const gc
+ 					keyvals[n_keys++] = GDK_KEY_Shift_L;
+ 				if (keys->level & 2)
+ 					keyvals[n_keys++] = GDK_KEY_Alt_R;
+-				/*
+-				 * @fixme heap buffer overflow
+-				 * In some cases, for example sending \t as the only sequence
+-				 * may lead to a buffer overflow
+-				 */
+ 				keyvals[n_keys++] = keyval;
+ 				/* Send keystroke to the plugin */
+ 				gp->priv->plugin->send_keystrokes(gp, keyvals, n_keys);
+@@ -721,11 +726,9 @@ void remmina_protocol_widget_send_clip_strokes(GtkClipboard *clipboard, const gc
+ 				/* Process next character in the keystrokes */
+ 				iter = g_utf8_find_next_char(iter, NULL);
+ 			}
+-			g_free(keyvals);
+-			g_free(iter);
+ 		}
+-		g_free(text);
+ 	}
++	g_free(text);
+ 	return;
+ }
+ 

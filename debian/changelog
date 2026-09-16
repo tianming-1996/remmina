@@ -1,3 +1,9 @@
+remmina (1.4.39+dfsg-1deepin3) unstable; urgency=medium
+
+  * fix: prevent memory errors when sending keystrokes
+
+ -- majiuping <majiuping@uniontech.com>  Wed, 16 Sep 2026 13:25:38 +0800
+
 remmina (1.4.39+dfsg-1deepin2) unstable; urgency=medium
 
   * feat: Add support for packaging with Linglong
